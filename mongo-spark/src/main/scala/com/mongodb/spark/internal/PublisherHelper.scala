@@ -20,7 +20,8 @@ import org.apache.spark.Logging
 import org.reactivestreams.{ Subscription, Subscriber, Publisher }
 
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.{ Promise, Future }
+import scala.concurrent.duration.Duration
+import scala.concurrent.{ Await, Promise, Future }
 import scala.language.implicitConversions
 
 object PublisherHelper extends Logging {
@@ -46,6 +47,14 @@ object PublisherHelper extends Logging {
     }
     publisher.subscribe(new FetchingSubscriber())
     promise.future
+  }
+
+  def publisherToIterator[T](publisher: Publisher[T]): Iterator[T] = new Iterator[T] {
+    lazy val results = Await.result(publisherToFuture(publisher), Duration.Inf).iterator
+
+    override def hasNext: Boolean = results.hasNext
+
+    override def next(): T = results.next()
   }
 
 }

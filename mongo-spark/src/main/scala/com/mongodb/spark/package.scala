@@ -18,7 +18,8 @@ package com.mongodb
 
 import com.mongodb.scala.reactivestreams.client.collection.Document
 import com.mongodb.spark.rdd.DocumentRDDFunctions
-import com.mongodb.spark.streaming.{ DocumentDStreamFunctions, StreamingContextFunctions }
+import com.mongodb.spark.streaming.{ SparkContextFunctions, DocumentDStreamFunctions, StreamingContextFunctions }
+import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.dstream.DStream
@@ -27,6 +28,9 @@ import org.bson.BsonValue
 import _root_.scala.language.implicitConversions
 
 package object spark {
+
+  implicit def toSparkContextFunctions(sc: SparkContext): SparkContextFunctions =
+    SparkContextFunctions(sc)
 
   implicit def toStreamingContextFunctions(ssc: StreamingContext): StreamingContextFunctions =
     StreamingContextFunctions(ssc)

@@ -17,28 +17,24 @@
 package com.mongodb.spark.rdd
 
 import com.mongodb.reactivestreams.client.Success
-import com.mongodb.scala.reactivestreams.client.collection.Document
+import com.mongodb.scala.reactivestreams.client.collection._
 import com.mongodb.spark.connection.MongoConnector
-import com.mongodb.spark.internal.PublisherHelper.publisherToFuture
-import org.apache.spark.rdd.RDD
+import com.mongodb.spark.internal.PublisherHelper._
+import org.apache.spark.SparkContext
 
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ Await, Future }
+import scala.concurrent.ExecutionContext.Implicits.global
 
-case class DocumentRDDFunctions(rdd: RDD[Document]) {
+case class DocumentFunctions(sc: SparkContext) {
 
-  private val mongoConnector = MongoConnector(rdd.context.getConf)
+  private val mongoConnector = MongoConnector(sc.getConf)
 
-  def saveToMongoDB(collectionName: String): Unit = {
+  def saveToMongoDB(collectionName: String, documents: Iterable[Document]): Unit = {
     val futures = new ListBuffer[Future[List[Success]]]
-    rdd.foreachPartition(iter => {
-      if (iter.nonEmpty) {
-        mongoConnector.getCollection[Document](collectionName).map(collection =>
-          futures += publisherToFuture(collection.insertMany(iter.toList)))
-      }
-    })
+    mongoConnector.getCollection[Document](collectionName).map(collection =>
+      futures += publisherToFuture(collection.insertMany(documents.toList)))
     Await.ready(Future.sequence(futures), Duration.Inf)
   }
 
