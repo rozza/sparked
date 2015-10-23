@@ -14,24 +14,37 @@
  * limitations under the License.
  */
 
-package com.mongodb.spark
+package org.mongodb
 
-import com.mongodb.scala.reactivestreams.client.collection._
-import com.mongodb.spark.rdd.DocumentRDDFunctions
+import org.mongodb.scala.Document
+import org.mongodb.spark.rdd.DocumentRDDFunctions
+import org.mongodb.spark.streaming.{ SparkContextFunctions, DocumentDStreamFunctions, StreamingContextFunctions }
+import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.StreamingContext
+import org.apache.spark.streaming.dstream.DStream
 import org.bson.BsonValue
 
-import scala.language.implicitConversions
+import _root_.scala.language.implicitConversions
 
-package object streaming {
+package object spark {
+
+  implicit def toSparkContextFunctions(sc: SparkContext): SparkContextFunctions =
+    SparkContextFunctions(sc)
 
   implicit def toStreamingContextFunctions(ssc: StreamingContext): StreamingContextFunctions =
     StreamingContextFunctions(ssc)
 
+  implicit def toDocumentDStream(dstream: DStream[Document]): DocumentDStreamFunctions =
+    DocumentDStreamFunctions(dstream)
+
   implicit def toDocumentRDDFunctions(rdd: RDD[Document]): DocumentRDDFunctions =
     DocumentRDDFunctions(rdd)
 
+  implicit def iterableToDocumentDStream(dstream: DStream[Iterable[(String, BsonValue)]]): DocumentDStreamFunctions =
+    DocumentDStreamFunctions(dstream.map(Document(_)))
+
   implicit def iterableToDocumentRDDFunctions[D <: Iterable[(String, BsonValue)]](rdd: RDD[D]): DocumentRDDFunctions =
     DocumentRDDFunctions(rdd.map(Document(_)))
+
 }

@@ -14,27 +14,25 @@
  * limitations under the License.
  */
 
-package com.mongodb.spark.rdd
-
-import com.mongodb.reactivestreams.client.Success
-import com.mongodb.scala.reactivestreams.client.collection._
-import com.mongodb.spark.connection.MongoConnector
-import com.mongodb.spark.internal.PublisherHelper._
-import org.apache.spark.SparkContext
+package org.mongodb.spark.rdd
 
 import scala.collection.mutable.ListBuffer
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ Await, Future }
-import scala.concurrent.ExecutionContext.Implicits.global
+
+import org.apache.spark.SparkContext
+import org.mongodb.scala._
+import org.mongodb.spark.connection.MongoConnector
 
 case class DocumentFunctions(sc: SparkContext) {
 
   private val mongoConnector = MongoConnector(sc.getConf)
 
   def saveToMongoDB(collectionName: String, documents: Iterable[Document]): Unit = {
-    val futures = new ListBuffer[Future[List[Success]]]
+    val futures = new ListBuffer[Future[Seq[Completed]]]
     mongoConnector.getCollection[Document](collectionName).map(collection =>
-      futures += publisherToFuture(collection.insertMany(documents.toList)))
+      futures += collection.insertMany(documents.toList).toFuture())
     Await.ready(Future.sequence(futures), Duration.Inf)
   }
 

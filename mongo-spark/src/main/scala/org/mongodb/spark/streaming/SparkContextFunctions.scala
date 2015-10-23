@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package com.mongodb.spark.streaming
+package org.mongodb.spark.streaming
 
-import com.mongodb.scala.reactivestreams.client.collection.Document
-import org.apache.spark.streaming.dstream.DStream
+import org.mongodb.scala.Document
+import org.mongodb.spark.rdd.{ DocumentFunctions, MongoDBInputRDD }
+import org.apache.spark.SparkContext
 
-case class DocumentDStreamFunctions(dstream: DStream[Document]) {
-  def saveToMongoDB(collectionName: String): Unit = {
-    dstream.foreachRDD(_.saveToMongoDB(collectionName))
-  }
+case class SparkContextFunctions(@transient val sc: SparkContext) extends Serializable {
+  def fromMongoDB() = MongoDBInputRDD(sc)
+  def saveToMongoDB(collectionName: String, documents: Iterable[Document]) = DocumentFunctions(sc).saveToMongoDB(collectionName, documents)
 }

@@ -14,22 +14,22 @@
  * limitations under the License.
  */
 
-package com.mongodb.spark.internal
+package org.mongodb.spark.internal
 
-import com.mongodb.scala.reactivestreams.client.{ FindPublisher, MongoCollection }
+import org.mongodb.scala.{ FindObservable, MongoCollection }
 
 import scala.reflect.ClassTag
 
 object FindHelper {
 
-  def getFindPublisher[D: ClassTag](collection: MongoCollection[D], findOptions: FindOptions): FindPublisher[D] = {
-    val findPublisher: FindPublisher[D] = collection.find[D](findOptions.filter).skip(findOptions.skip).limit(findOptions.limit)
+  def getFindObservable[D: ClassTag](collection: MongoCollection[D], findOptions: FindOptions): FindObservable[D] = {
+    val findObservable: FindObservable[D] = collection.find[D](findOptions.filter).skip(findOptions.skip).limit(findOptions.limit)
 
-    findOptions.projection.map(_ => findPublisher.projection(_))
-    findOptions.sort.map(_ => findPublisher.sort(_))
-    findOptions.maxTime.map(_ => findPublisher.maxTime(_))
+    findOptions.projection.map(_ => findObservable.projection(_))
+    findOptions.sort.map(_ => findObservable.sort(_))
+    findOptions.maxTime.map(_ => findObservable.maxTime(_))
 
-    findPublisher
+    findObservable
   }
 
 }

@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.mongodb.spark.streaming
+package org.mongodb.spark.streaming
 
-import com.mongodb.scala.reactivestreams.client.collection.Document
-import com.mongodb.spark.connection.MongoConnector
+import org.mongodb.scala.Document
+import org.mongodb.spark.connection.MongoConnector
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.StreamingContext
 

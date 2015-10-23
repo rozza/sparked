@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-package com.mongodb.spark.internal
+package org.mongodb.spark.streaming
 
-import com.mongodb.scala.reactivestreams.client.collection.Document
-import org.bson.conversions.Bson
+import org.apache.spark.streaming.StreamingContext
 
-import scala.concurrent.duration.Duration
-
-case class FindOptions(filter: Bson = Document(), skip: Int = 0, limit: Int = 0, sort: Option[Bson] = None,
-                       projection: Option[Bson] = None, maxTime: Option[Duration] = None)
+case class StreamingContextFunctions(ssc: StreamingContext) {
+  def fromMongoDB() = MongoDBUtils.createStream(ssc)
+}

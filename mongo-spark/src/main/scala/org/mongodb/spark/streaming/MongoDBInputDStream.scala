@@ -14,33 +14,33 @@
  * limitations under the License.
  */
 
-package com.mongodb.spark.rdd
+package org.mongodb.spark.streaming
 
-import com.mongodb.scala.reactivestreams.client.collection.Document
-import com.mongodb.spark.connection.MongoConnector
-import com.mongodb.spark.internal.FindHelper.getFindPublisher
-import com.mongodb.spark.internal.FindOptions
-import com.mongodb.spark.internal.PublisherHelper.{ publisherToFuture, publisherToIterator }
-import org.apache.spark._
-import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.rdd.RDD
-import org.bson.conversions.Bson
-import org.reactivestreams.Subscription
-
+import scala.annotation.meta.param
 import scala.concurrent.duration.Duration
-import scala.concurrent.{ Await, Future }
 import scala.reflect.ClassTag
 import scala.util.{ Failure, Success }
 
-object MongoDBInputRDD {
-  def apply(sc: SparkContext) = new MongoDBInputRDD[Document](sc)
-}
+import org.bson.conversions.Bson
 
-class MongoDBInputRDD[D: ClassTag](sc: SparkContext) extends RDD[D](sc, Nil) with Logging {
+import org.apache.spark.Logging
+import org.apache.spark.storage.StorageLevel
+import org.apache.spark.streaming.StreamingContext
+import org.apache.spark.streaming.dstream.ReceiverInputDStream
+import org.apache.spark.streaming.receiver.Receiver
+import org.mongodb.scala.{ Observer, Subscription }
+import org.mongodb.spark.connection.MongoConnector
+import org.mongodb.spark.internal.FindHelper.getFindObservable
+import org.mongodb.spark.internal.FindOptions
 
-  private val mongoConnector = MongoConnector(sc.getConf)
+private[streaming] class MongoDBInputDStream[D: ClassTag](
+    @(transient @param) ssc_ :StreamingContext,
+    connector:               MongoConnector,
+    storageLevel:            StorageLevel
+) extends ReceiverInputDStream[D](ssc_) with Logging {
 
   private var findOptions = FindOptions()
+
   /**
    * Sets the query filter to apply to the query.
    *
@@ -48,7 +48,7 @@ class MongoDBInputRDD[D: ClassTag](sc: SparkContext) extends RDD[D](sc, Nil) wit
    * @param filter the filter, which may be null.
    * @return this
    */
-  def filter(filter: Bson): MongoDBInputRDD[D] = {
+  def filter(filter: Bson): MongoDBInputDStream[D] = {
     findOptions = findOptions.copy(filter = filter)
     this
   }
@@ -60,7 +60,7 @@ class MongoDBInputRDD[D: ClassTag](sc: SparkContext) extends RDD[D](sc, Nil) wit
    * @param limit the limit, which may be null
    * @return this
    */
-  def limit(limit: Int): MongoDBInputRDD[D] = {
+  def limit(limit: Int): MongoDBInputDStream[D] = {
     findOptions = findOptions.copy(limit = limit)
     this
   }
@@ -72,7 +72,7 @@ class MongoDBInputRDD[D: ClassTag](sc: SparkContext) extends RDD[D](sc, Nil) wit
    * @param skip the number of documents to skip
    * @return this
    */
-  def skip(skip: Int): MongoDBInputRDD[D] = {
+  def skip(skip: Int): MongoDBInputDStream[D] = {
     findOptions = findOptions.copy(skip = skip)
     this
   }
@@ -84,7 +84,7 @@ class MongoDBInputRDD[D: ClassTag](sc: SparkContext) extends RDD[D](sc, Nil) wit
    * @param duration the duration
    * @return this
    */
-  def maxTime(duration: Duration): MongoDBInputRDD[D] = {
+  def maxTime(duration: Duration): MongoDBInputDStream[D] = {
     findOptions = findOptions.copy(maxTime = Some(duration))
     this
   }
@@ -96,7 +96,7 @@ class MongoDBInputRDD[D: ClassTag](sc: SparkContext) extends RDD[D](sc, Nil) wit
    * @param projection the project document, which may be null.
    * @return this
    */
-  def projection(projection: Bson): MongoDBInputRDD[D] = {
+  def projection(projection: Bson): MongoDBInputDStream[D] = {
     findOptions = findOptions.copy(projection = Some(projection))
     this
   }
@@ -108,25 +108,49 @@ class MongoDBInputRDD[D: ClassTag](sc: SparkContext) extends RDD[D](sc, Nil) wit
    * @param sort the sort criteria, which may be null.
    * @return this
    */
-  def sort(sort: Bson): MongoDBInputRDD[D] = {
+  def sort(sort: Bson): MongoDBInputDStream[D] = {
     findOptions = findOptions.copy(sort = Some(sort))
     this
   }
 
-  @DeveloperApi
-  override def compute(split: Partition, context: TaskContext): Iterator[D] = {
-    var subscription: Option[Subscription] = None
+  override def getReceiver(): Receiver[D] = {
+    return new MongoDBReceiver[D](connector, findOptions, storageLevel);
+  }
+}
+
+private[streaming] class MongoDBReceiver[D: ClassTag](
+    mongoConnector: MongoConnector,
+    findOptions:    FindOptions, storageLevel: StorageLevel
+) extends Receiver[D](storageLevel) with Logging {
+
+  private var subscription: Option[Subscription] = None
+
+  override def onStart(): Unit = {
     mongoConnector.getCollection[D]() match {
       case Success(collection) => {
-        publisherToIterator(getFindPublisher(collection, findOptions))
-        val future: Future[List[D]] = publisherToFuture(getFindPublisher(collection, findOptions))
-        Await.result(future, Duration.Inf).toIterator
+        getFindObservable(collection, findOptions).subscribe(
+          new Observer[D] {
+            override def onSubscribe(sub: Subscription): Unit = {
+              subscription = Some(sub)
+              sub.request(Long.MaxValue)
+            }
+            override def onNext(doc: D): Unit = store(doc)
+
+            override def onError(throwable: Throwable): Unit = stop("Observable errored", throwable)
+
+            override def onComplete(): Unit = stop("publisher finished")
+
+          }
+        )
       }
-      case Failure(ex) => throw new SparkException("Failed to connect to MongoDB", ex)
+      case Failure(ex) => stop("Failed to connect to MongoDB", ex)
     }
   }
 
-  override protected def getPartitions: Array[Partition] = Array(new Partition {
-    override def index: Int = 0
-  })
+  override def onStop(): Unit = {
+    if (subscription.nonEmpty) {
+      subscription.get.unsubscribe();
+    }
+  }
 }
+

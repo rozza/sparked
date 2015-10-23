@@ -14,13 +14,11 @@
  * limitations under the License.
  */
 
-package com.mongodb.example
+package org.mongodb.example
 
-import com.mongodb.scala.reactivestreams.client.Implicits._
-import com.mongodb.scala.reactivestreams.client.collection.Document
-import com.mongodb.spark._
 import org.apache.spark.{ SparkConf, SparkContext }
-import org.bson.{ BsonDocument, BsonString }
+import org.mongodb.scala.Document
+import org.mongodb.spark._
 
 object PubNames {
   def main(args: Array[String]) {
@@ -28,21 +26,21 @@ object PubNames {
     // Using pubnames data from: https://github.com/rozza/pubnames
 
     val mongoDBOptions = Map(
-      "com.mongodb.spark.uri" -> "mongodb://trusty64",
-      "com.mongodb.spark.databaseName" -> "demos",
-      "com.mongodb.spark.collectionName" -> "pubs"
+      "org.mongodb.spark.uri" -> "mongodb://localhost",
+      "org.mongodb.spark.databaseName" -> "demos",
+      "org.mongodb.spark.collectionName" -> "pubs"
     )
     val sparkConf = new SparkConf().setMaster("local").setAppName("CustomReceiver").setAll(mongoDBOptions)
 
     val sc = new SparkContext(sparkConf)
     val pubNames = sc.fromMongoDB()
-      .filter(BsonDocument.parse(
+      .filter(Document(
         """{"location": {"$geoWithin": {"$geometry": {"type": "Polygon",
         |"coordinates": [[[-13.0, 48.1], [-13.0, 60.75], [4.55, 60.75], [4.55, 48.1], [-13.0, 48.1]]]}}}}""".stripMargin
       ))
       .skip(100)
       .limit(5000) // All in MongoDB
-      .map(_.getOrElse("name", new BsonString("Nameless")).asString().getValue) // Now in Spark
+      .map(_.getOrElse("name", "Nameless").asString().getValue) // Now in Spark
       .countByValue()
       .map((kv: (String, Long)) => Document("name" -> kv._1, "count" -> kv._2.toInt))
 

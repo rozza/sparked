@@ -14,18 +14,12 @@
   * limitations under the License.
   */
 
-import com.typesafe.sbt.SbtGhPages.GhPagesKeys._
-import com.typesafe.sbt.SbtGhPages._
-import com.typesafe.sbt.SbtGit.GitKeys._
 import com.typesafe.sbt.SbtScalariform._
-import com.typesafe.sbt.SbtSite.SiteKeys._
-import com.typesafe.sbt._
 import org.scalastyle.sbt.ScalastylePlugin._
 import sbt.Keys._
 import sbt._
 import sbtassembly.Plugin.AssemblyKeys._
 import sbtassembly.Plugin._
-import sbtunidoc.Plugin._
 import scoverage.ScoverageSbtPlugin._
 
 object MongoSparkBuild extends Build {
@@ -37,42 +31,12 @@ object MongoSparkBuild extends Build {
     organization := "org.mongodb.spark",
     organizationHomepage := Some(url("http://www.mongodb.org")),
     version := "0.1-SNAPSHOT",
-    scalaVersion := "2.11.5",
+    scalaVersion := "2.11.7",
     libraryDependencies ++= coreDependencies ++ testDependencies,
     resolvers := mongoSparkResolvers,
     scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature" /*, "-Xlog-implicits", "-Yinfer-debug", "-Xprint:typer"*/),
     scalacOptions in(Compile, doc) ++= Seq("-diagrams", "-unchecked", "-doc-root-content", "mongo-spark/rootdoc.txt")
   )
-
-  /*
-   * Documentation
-   */
-  val docSettings =
-    SbtSite.site.settings ++
-      SbtSite.site.sphinxSupport() ++
-      ghpages.settings ++
-      unidocSettings ++
-      Seq(
-        siteSourceDirectory := file("docs"),
-        siteDirectory := file("target/site"),
-        // depending on the version, copy the api files to a different directory
-        siteMappings <++= (mappings in packageDoc in ScalaUnidoc, version) map {
-          (m, v) =>
-            for ((f, d) <- m) yield (f, if (v.trim.endsWith("SNAPSHOT")) ("api/master/" + d) else ("api/" + v + "/" + d))
-        },
-        // override the synchLocal task to avoid removing the existing files
-        synchLocal <<= (privateMappings, updatedRepository, ghpagesNoJekyll, gitRunner, streams) map {
-          (mappings, repo, noJekyll, git, s) =>
-            val betterMappings = mappings map {
-              case (file, target) => (file, repo / target)
-            }
-            IO.copy(betterMappings)
-            if (noJekyll) IO.touch(repo / ".nojekyll")
-            repo
-        },
-        ghpagesNoJekyll := true,
-        gitRemoteRepo := "git@github.com:mongodb/mongo-scala-driver.git"
-      ) ++ inConfig(config("sphinx"))(Seq(sourceDirectory := file("docs")))
 
   val publishSettings = Publish.settings
 
@@ -126,11 +90,11 @@ object MongoSparkBuild extends Build {
   val mongoSparkAssemblyJarSettings = assemblySettings ++
     addArtifact(Artifact("mongo-spark-alldep", "jar", "jar"), assembly) ++ Seq(test in assembly := {},
     excludedJars in assembly := {
-      (fullClasspath in assembly).value filter {_.data.getName.startsWith("mongo-scala-reactivestreams-alldep")}
+      (fullClasspath in assembly).value filter {_.data.getName.startsWith("mongo-scala-driver-alldep")}
     })
 
   lazy val mongoSpark = Project(
-    id = "mongoSpark",
+    id = "mongo-spark",
     base = file("mongo-spark")
   ).configs(IntTest)
     .configs(UnitTest)
@@ -141,19 +105,18 @@ object MongoSparkBuild extends Build {
     .settings(customScalariformSettings: _*)
     .settings(scalaStyleSettings: _*)
     .settings(scoverageSettings: _*)
-    .settings(initialCommands in console := """import com.mongodb.scala._""")
+    .settings(initialCommands in console := """import org.mongodb.scala._""")
 
-  lazy val root = Project(
-    id = "root",
+  lazy val sparked = Project(
+    id = "sparked",
     base = file(".")
   ).aggregate(mongoSpark)
     .dependsOn(mongoSpark)
     .settings(buildSettings: _*)
-    .settings(docSettings: _*)
     .settings(scalaStyleSettings: _*)
     .settings(scoverageSettings: _*)
     .settings(publish := {}, publishLocal := {})
 
-  override def rootProject = Some(root)
+  override def rootProject = Some(sparked)
 
 }

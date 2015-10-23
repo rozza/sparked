@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.mongodb.spark.connection
+package org.mongodb.spark.connection
 
-import com.mongodb.scala.reactivestreams.client
+import org.mongodb.scala._
 import org.apache.spark.SparkConf
 
 import scala.reflect.ClassTag
@@ -24,20 +24,20 @@ import scala.util.Try
 
 object MongoConnector {
   def apply(conf: SparkConf): MongoConnector = {
-    val uri = conf.get("com.mongodb.spark.uri", "mongodb://")
-    val databaseName = conf.get("com.mongodb.spark.databaseName")
-    val collectionName = conf.get("com.mongodb.spark.collectionName")
+    val uri = conf.get("org.mongodb.spark.uri", "mongodb://")
+    val databaseName = conf.get("org.mongodb.spark.databaseName")
+    val collectionName = conf.get("org.mongodb.spark.collectionName")
     MongoConnector(uri, databaseName, collectionName)
   }
 }
 
 case class MongoConnector(uri: String, databaseName: String, collectionName: String) {
 
-  def getCollection[D: ClassTag](): Try[client.MongoCollection[D]] = {
-    Try(client.MongoClient(uri).getDatabase(databaseName).getCollection[D](collectionName))
+  def getCollection[D: ClassTag](): Try[MongoCollection[D]] = {
+    Try(MongoClient(uri).getDatabase(databaseName).getCollection[D](collectionName))
   }
 
-  def getCollection[D: ClassTag](alternativeCollectionName: String): Try[client.MongoCollection[D]] = {
-    Try(client.MongoClient(uri).getDatabase(databaseName).getCollection[D](alternativeCollectionName))
+  def getCollection[D: ClassTag](alternativeCollectionName: String): Try[MongoCollection[D]] = {
+    Try(MongoClient(uri).getDatabase(databaseName).getCollection[D](alternativeCollectionName))
   }
 }

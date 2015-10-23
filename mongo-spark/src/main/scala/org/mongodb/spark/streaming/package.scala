@@ -14,10 +14,24 @@
  * limitations under the License.
  */
 
-package com.mongodb.spark.streaming
+package org.mongodb.spark
 
+import org.mongodb.scala.Document
+import org.mongodb.spark.rdd.DocumentRDDFunctions
+import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.StreamingContext
+import org.bson.BsonValue
 
-case class StreamingContextFunctions(ssc: StreamingContext) {
-  def fromMongoDB() = MongoDBUtils.createStream(ssc)
+import scala.language.implicitConversions
+
+package object streaming {
+
+  implicit def toStreamingContextFunctions(ssc: StreamingContext): StreamingContextFunctions =
+    StreamingContextFunctions(ssc)
+
+  implicit def toDocumentRDDFunctions(rdd: RDD[Document]): DocumentRDDFunctions =
+    DocumentRDDFunctions(rdd)
+
+  implicit def iterableToDocumentRDDFunctions[D <: Iterable[(String, BsonValue)]](rdd: RDD[D]): DocumentRDDFunctions =
+    DocumentRDDFunctions(rdd.map(Document(_)))
 }

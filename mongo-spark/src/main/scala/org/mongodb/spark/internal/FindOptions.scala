@@ -14,14 +14,12 @@
  * limitations under the License.
  */
 
-package com.mongodb.spark.streaming
+package org.mongodb.spark.internal
 
-import com.mongodb.scala.reactivestreams.client.collection.Document
-import com.mongodb.spark.rdd.{ DocumentFunctions, MongoDBInputRDD }
-import org.apache.spark.SparkContext
+import org.mongodb.scala.Document
+import org.bson.conversions.Bson
 
-case class SparkContextFunctions(@transient val sc: SparkContext) extends Serializable {
-  def fromMongoDB() = MongoDBInputRDD(sc)
-  def saveToMongoDB(collectionName: String, documents: Iterable[Document]) =
-    DocumentFunctions(sc).saveToMongoDB(collectionName, documents)
-}
+import scala.concurrent.duration.Duration
+
+case class FindOptions(filter: Bson = Document(), skip: Int = 0, limit: Int = 0, sort: Option[Bson] = None,
+                       projection: Option[Bson] = None, maxTime: Option[Duration] = None)
